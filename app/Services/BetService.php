@@ -1,55 +1,118 @@
 <?php
 
 namespace App\Services;
+
 use App\Interfaces\BetInterface;
 
 class BetService implements BetInterface
 {
 
     public $table;
-    public $symbolsMatched = [];
     public $betAmount;
+    protected $arrayValue = [];
+    protected $payLine;
+    protected $symbolsMatched = [];
 
     public function doBet($betAmount = 100)
     {
         $this->betAmount = $betAmount;
         $this->generateRandomTable();
-        $this->calculatePayLine();
+        $this->calculatePayLines();
     }
 
-    public function getBetResult() : string
+    /**
+     * @return string
+     * @throws \Exception
+     */
+    public function getBetResult(): string
     {
         return json_encode([
-            'board' => '[' . $this->generateViewTable().']',
-            'paylines' => $this->generatePayLineText(),
+            'board' => '[' . $this->generateViewTable() . ']',
+            'paylines' => $this->getPayLines(),
             'bet_amount' => $this->betAmount,
             'win_total' => $this->getTotalWin()
         ], JSON_PRETTY_PRINT);
     }
 
-    public function calculatePayLine()
+    /**
+     * @return string
+     */
+    protected function getPayLines()
     {
-        $this->symbolsMatched[] = 3;
-        $this->symbolsMatched[] = 4;
+        return !empty($this->payLine) ? $this->payLine : 'Unfortunately there were no hits';
     }
 
-    public function generatePayLineText()
+    /**
+     * @throws \Exception
+     */
+    protected function calculatePayLines()
     {
-        foreach ($this->table as $line) {
-            $payLineText[] = [join(" ", $line) => 3];
+        $possibleWinSequences = config('bet.win_sequence');
+
+        foreach ($possibleWinSequences as $possibleWinSequence) {
+            $this->calculatePayLine($possibleWinSequence);
+        }
+    }
+
+    /**
+     * @param $possibleWinSequence
+     * @throws \Exception
+     */
+    protected function calculatePayLine($possibleWinSequence)
+    {
+        $count = 0;
+        foreach ($possibleWinSequence as $sequence) {
+            if (empty($symbol = $this->getSymbol($sequence))) {
+                throw new \Exception('Error to find symbol on table');
+            }
+
+            if ($count == 0) {
+                $previous = $symbol;
+                $count = 1;
+                continue;
+            }
+
+            $count = $symbol === $previous ? $count + 1 : 0;
+            $previous = $symbol;
         }
 
-        return $payLineText;
+        if ($count >= 3) {
+            $this->symbolsMatched[] = $count;
+            $this->generatePayLineText($possibleWinSequence, $count);
+        }
+    }
+
+    /**
+     * @param $key
+     * @return mixed
+     */
+    protected function getSymbol($key)
+    {
+        return $this->arrayValue[$key];
+    }
+
+    /**
+     * @param $sequence
+     * @param $count
+     */
+    public function generatePayLineText($sequence, $count)
+    {
+        $this->payLine[] = [join(" ", $sequence) => $count];
     }
 
     public function generateRandomTable()
     {
-        $this->table[0] = $this->generateLine([0, 3, 6, 9, 12]);
-        $this->table[1] = $this->generateLine([1, 4, 7, 10, 13]);
-        $this->table[2] = $this->generateLine([2, 5, 8, 11, 14]);
+        $baseTable = config('bet.base_table');
+
+        foreach ($baseTable as $key => $value) {
+            $this->table[$key] = $this->generateLine($value, $key);
+        }
     }
 
-    public function generateViewTable()
+    /**
+     * @return string
+     */
+    public function generateViewTable(): string
     {
         foreach ($this->table as $line) {
             $textTable[] = join(',', $line);
@@ -57,15 +120,23 @@ class BetService implements BetInterface
         return join(',', $textTable);
     }
 
-    private function generateLine(array $baseElements) : array
+    /**
+     * @param array $baseElements
+     * @return array
+     */
+    protected function generateLine(array $baseElements): array
     {
         foreach ($baseElements as $element) {
-            $line[$element] = SymbolService::generateRandomSymbol();
+            $this->arrayValue[$element] = $line[$element] = SymbolService::generateRandomSymbol();
         }
         return $line;
     }
 
-    public function getTotalWin()
+    /**
+     * @return float
+     * @throws \Exception
+     */
+    public function getTotalWin(): float
     {
         $totalWin = [];
         foreach ($this->symbolsMatched as $symbolMatched) {

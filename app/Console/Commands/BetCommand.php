@@ -29,8 +29,13 @@ class BetCommand extends Command
      */
     public function handle()
     {
-        $betService = new BetService();
-        $betService->doBet();
-        $this->info($betService->getBetResult());
+        try {
+            $betService = new BetService();
+            $betService->doBet();
+            $this->info($betService->getBetResult());
+        } catch (\Exception $exception) {
+            $this->error($exception->getMessage());
+        }
+
     }
 }
