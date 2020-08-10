@@ -9,13 +9,18 @@ class BetService implements BetInterface
 
     public $table;
     public $betAmount;
-    protected $arrayValue = [];
+    public $arrayValue = [];
     protected $payLine;
     protected $symbolsMatched = [];
 
-    public function doBet($betAmount = 100)
+
+    public function __construct($betAmount = 100)
     {
         $this->betAmount = $betAmount;
+    }
+
+    public function doBet()
+    {
         $this->generateRandomTable();
         $this->calculatePayLines();
     }
@@ -45,7 +50,7 @@ class BetService implements BetInterface
     /**
      * @throws \Exception
      */
-    protected function calculatePayLines()
+    public function calculatePayLines()
     {
         $possibleWinSequences = config('bet.win_sequence');
 
@@ -72,15 +77,22 @@ class BetService implements BetInterface
                 continue;
             }
 
-            $count = $symbol === $previous ? $count + 1 : 0;
-            $previous = $symbol;
-        }
+            if($symbol == $previous) {
+                $previous = $symbol;
+                $count++;
+                continue;
+            }
 
-        if ($count >= 3) {
-            $this->symbolsMatched[] = $count;
-            $this->generatePayLineText($possibleWinSequence, $count);
+            if ($count >= 3) {
+                $this->symbolsMatched[] = $count;
+                $this->generatePayLineText($possibleWinSequence, $count);
+            }
+
+            $count = 0;
         }
     }
+
+
 
     /**
      * @param $key
@@ -105,7 +117,7 @@ class BetService implements BetInterface
         $baseTable = config('bet.base_table');
 
         foreach ($baseTable as $key => $value) {
-            $this->table[$key] = $this->generateLine($value, $key);
+            $this->table[$key] = $this->generateLine($value);
         }
     }
 
